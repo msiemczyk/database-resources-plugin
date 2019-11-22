@@ -1,0 +1,21 @@
+<?jelly escape-by-default='true'?>
+<j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define"
+	   xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:f="/lib/form">
+	 
+	<f:section title="${%Database Resources}">
+        <f:entry title="${%Timeout} (${%in minutes})" field="timeoutInMinutes">
+            <f:number default="720" clazz="required positive-number"/>
+	    </f:entry>
+        <f:entry title="${%Resources}">
+            <f:repeatable field="configuredResources" header="${%Resource}" add="${%Add database resource}">
+                <table width="100%">
+                    <st:include page="config.jelly" class="org.jenkins.plugins.databaseresources.DatabaseResource"/>
+                    <f:entry>
+                        <div align="right"><f:repeatableDeleteButton/></div>
+                    </f:entry>
+                </table>
+            </f:repeatable>
+        </f:entry>
+    </f:section>
+	
+</j:jelly>

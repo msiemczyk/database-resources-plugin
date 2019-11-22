@@ -1,0 +1,6 @@
+<?jelly escape-by-default='true'?>
+<div>
+  This plugin allows to define external database resources (like Oracle RDMS)
+  that can be locked by builds. If there are no available nodes belonging to
+  a resource the build will wait for the resource to become free.
+</div>

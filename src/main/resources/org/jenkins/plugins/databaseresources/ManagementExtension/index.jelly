@@ -1,0 +1,91 @@
+<?jelly escape-by-default='true'?>
+<j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define"
+        xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:f="/lib/form">
+      
+    <l:layout permission="${app.ADMINISTER}" title="Database Resources">
+        <l:side-panel>
+            <l:tasks>
+                <l:task icon="images/24x24/up.gif" href="${rootURL}/"
+                    title="${%Back to Dashboard}" />
+            </l:tasks>
+        </l:side-panel>
+        
+        <l:main-panel>
+            <h1>${%Database Resources}</h1>
+        
+            <j:forEach var="resource" items="${it.resourceInfos}" indexVar="i">
+            
+                <div style="width: auto">
+                <l:pane width="1" id="resourceTable${i}"
+                        title="${resource.name} - &lt;em style='font-weight: normal' &gt;${resource.description}&lt;/em&gt;">
+                    <tr>
+                        <td>
+                            <ul>
+                                <j:forEach var="nodeInfosByLabel" items="${resource.nodeInfosByLabel}">
+                                    
+                                    <li>
+                                        <div>
+                                            ${nodeInfosByLabel.key}
+                                            
+                                            <div style="padding: 1em 50px 1em 25px">
+                                                <table class="pane" style="border: 1px #bbb solid">
+                                                    <tr>
+                                                        <td class="pane-header">${%Node}</td>
+                                                        <td class="pane-header" style="width: 100px; text-align: center">
+                                                            ${%Status}
+                                                        </td>
+                                                        <td class="pane-header" style="width: 100px; text-align: center">
+                                                            ${%Actions}
+                                                        </td>
+                                                    </tr>
+                                                    
+                                                    <j:forEach var="nodeInfo" items="${nodeInfosByLabel.value}">
+                                                        
+                                                        <tr>
+                                                            <td class="pane">
+                                                                <a href="../computer/${nodeInfo.name}">${nodeInfo.name}</a>
+                                                            </td>
+                                                            <td class="pane" style="text-align: center">
+                                                                <j:if test="${nodeInfo.isLocked}">
+                                                                    <img src="${rootURL}/plugin/database-resources/images/32x32/locked-icon.png"
+                                                                        height="24" width="24" alt="${%Node is locked}"
+                                                                        tooltip="${%Node is locked}" />
+                                                                </j:if>
+                                                            </td>
+                                                            <td class="pane yui-button danger" style="text-align: center">
+                                                                <form method="post" action="unlock">
+                                                                    <input type="hidden" name="nodeName" value="${nodeInfo.name}" />
+                                                                    
+                                                                    <div>
+                                                                        <j:choose>
+                                                                            <j:when test="${nodeInfo.isLocked}">
+                                                                                <button type="submit">Unlock</button>
+                                                                            </j:when>
+                                                                            <j:otherwise>
+                                                                                <button disabled="disabled">Unlock</button>
+                                                                            </j:otherwise>
+                                                                        </j:choose>
+                                                                    </div>
+                                                                </form>
+                                                            </td>
+                                                        </tr>
+                                                        
+                                                    </j:forEach>
+                                                    
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </li>
+                                    
+                                </j:forEach>
+                            </ul>
+                        </td>
+                    </tr>
+                </l:pane>
+                </div>
+                
+            </j:forEach>
+            
+        </l:main-panel>
+    </l:layout>
+</j:jelly>
