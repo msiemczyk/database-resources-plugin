@@ -41,7 +41,7 @@
         <compiler.version>1.8</compiler.version>
         
         <jenkins.version>2.19.4</jenkins.version>
-	</properties>
+    </properties>
     
     <build>
         <plugins>
