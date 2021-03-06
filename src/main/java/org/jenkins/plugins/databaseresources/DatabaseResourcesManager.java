@@ -58,7 +58,7 @@ public class DatabaseResourcesManager {
 
         return Optional.ofNullable(GlobalConfiguration.all().get(GlobalConfigurationExtension.class))
             .map(GlobalConfigurationExtension::getConfiguredResources)
-            .orElse(new ArrayList<DatabaseResource>());
+            .orElse(new ArrayList<>());
     }
 
     public DatabaseResource getResource(final String resourceName) {
@@ -119,7 +119,7 @@ public class DatabaseResourcesManager {
         long startTime = System.currentTimeMillis();
         
         while (true) {
-            List<Node> availableNodes = Jenkins.getInstance().getLabels().stream()
+            List<Node> availableNodes = Jenkins.get().getLabels().stream()
                 .filter(label -> databaseResource.getLabelsSet().contains(label.getExpression()))
                 .flatMap(filteredLabel -> filteredLabel.getNodes().stream())
                 .filter(node -> node.toComputer().isOnline())

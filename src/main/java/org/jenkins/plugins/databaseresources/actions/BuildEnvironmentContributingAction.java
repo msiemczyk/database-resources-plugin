@@ -16,34 +16,35 @@
  */
 package org.jenkins.plugins.databaseresources.actions;
 
+import java.util.List;
+
 import org.apache.commons.lang.StringUtils;
 
 import hudson.EnvVars;
 import hudson.model.AbstractBuild;
 import hudson.model.EnvironmentContributingAction;
 import hudson.model.InvisibleAction;
+import hudson.slaves.EnvironmentVariablesNodeProperty.Entry;
 
 public class BuildEnvironmentContributingAction extends InvisibleAction implements EnvironmentContributingAction {
 	
 	private final String variablePrefix;
-	private final String hostName;
-	private final String sid;
-    private final String vmName;
+	
+	private final String nodeName;
+	private final List<Entry> nodeEnvVariables;
 	
 	public BuildEnvironmentContributingAction(
 	        final String variablePrefix,
-	        final String hostName,
-	        final String sid,
-	        final String vmName) {
+	        final String nodeName,
+	        final List<Entry> nodeEnvVariables) {
 
         super();
         
         this.variablePrefix = variablePrefix;
-        this.hostName = hostName;
-        this.sid = sid;
-        this.vmName = vmName;
+        this.nodeName = nodeName;
+        this.nodeEnvVariables = nodeEnvVariables;
     }
-
+	
     @Override
     public void buildEnvVars(AbstractBuild<?, ?> build, EnvVars environmentVariables) {
 
@@ -53,8 +54,11 @@ public class BuildEnvironmentContributingAction extends InvisibleAction implemen
             prefix = variablePrefix.endsWith("_") ? variablePrefix : variablePrefix + "_";
         }
             
-        environmentVariables.put(prefix + "DB_HOST_NAME", hostName);
-        environmentVariables.put(prefix + "DB_HOST_SID", sid);
-        environmentVariables.put(prefix + "DB_VM_NAME", vmName);
+        environmentVariables.put(prefix + "NODE_NAME", nodeName);
+        
+        for (Entry envVariable : nodeEnvVariables) {
+            environmentVariables.put(prefix + envVariable.key, envVariable.value);
+        }
+        
     }
 }

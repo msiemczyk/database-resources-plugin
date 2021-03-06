@@ -37,6 +37,7 @@ import hudson.model.AbstractBuild;
 import hudson.model.BuildListener;
 import hudson.model.Descriptor;
 import hudson.model.Node;
+import hudson.slaves.EnvironmentVariablesNodeProperty;
 import hudson.tasks.BuildWrapper;
 
 /**
@@ -85,12 +86,13 @@ public class DatabaseResourcesBuildWrapper extends BuildWrapper {
                     DatabaseResourcesManager.getInstance().getResource(resourceName).getDescription(),
                     lockedNodesByResourceName.get(resourceName).getNodeName()));
             
-            String vmName = Optional.ofNullable(node.getNodeProperties().get(NodePropertyExtension.class))
-                .map(NodePropertyExtension::getVmName)
-                .orElse(node.getNodeName());
+            List<EnvironmentVariablesNodeProperty.Entry> nodeEnvVariables = Optional.ofNullable(
+                    node.getNodeProperties().get(EnvironmentVariablesNodeProperty.class))
+                .map(EnvironmentVariablesNodeProperty::getEnv)
+                .orElse(new ArrayList<>());
 
             build.addAction(new BuildEnvironmentContributingAction(
-                requiredResource.getVariablePrefix(), node.getNodeName(), "APROD", vmName));
+                requiredResource.getVariablePrefix(), node.getNodeName(), nodeEnvVariables));
             
             logger.println(
                 LOG_PREFIX + "Successfully acquired '" + node.getNodeName() + "' from '" + resourceName + "'.");

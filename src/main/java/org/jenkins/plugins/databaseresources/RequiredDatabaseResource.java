@@ -43,6 +43,10 @@ public class RequiredDatabaseResource extends AbstractDescribableImpl<RequiredDa
             throw new IllegalArgumentException("Given resource name is blank.");
         }
         
+        if (resourceDoesNotExist(resourceName)) {
+            throw new IllegalArgumentException("Resource with name '" + resourceName + "' does not exist.");
+        }
+        
         this.resourceName = resourceName;
         this.variablePrefix = variablePrefix;
     }
@@ -55,6 +59,11 @@ public class RequiredDatabaseResource extends AbstractDescribableImpl<RequiredDa
     public String getVariablePrefix() {
         
         return variablePrefix;
+    }
+    
+    private static boolean resourceDoesNotExist(final String resourceName) {
+
+        return DatabaseResourcesManager.getInstance().getResource(resourceName) == null;
     }
     
     @Extension
@@ -71,7 +80,17 @@ public class RequiredDatabaseResource extends AbstractDescribableImpl<RequiredDa
                 @QueryParameter
                 final String value) {
            
-            return FormValidation.validateRequired(value);
+            final FormValidation validateRequired = FormValidation.validateRequired(value);
+            
+            if (validateRequired != FormValidation.ok()) {
+                return validateRequired;
+            }
+            
+            if (resourceDoesNotExist(value)) {
+                return FormValidation.error("Resource with name '" + value + "' does not exist.");
+            }
+            
+            return FormValidation.ok();
         }
         
         /**
