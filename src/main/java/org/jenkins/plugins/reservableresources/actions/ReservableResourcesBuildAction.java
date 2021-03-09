@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019 Maciek Siemczyk
+ * Copyright (C) 2021 Maciek Siemczyk
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -37,7 +37,7 @@ public class ReservableResourcesBuildAction implements Action {
     @Override
     public String getIconFileName() {
 
-        return "/plugin/reservable-resources/images/24x24/database-icon.png";
+        return "/plugin/reservable-resources/images/main-icon.png";
     }
 
     @Override
@@ -54,18 +54,14 @@ public class ReservableResourcesBuildAction implements Action {
     
     public static final class AcquiredResource {
         
-        public final String name;
-        public final String description;
-        
+        public final String label;
         public final String nodeName;
         
         public AcquiredResource(
-                final String name,
-                final String description,
+                final String label,
                 final String nodeName) {
 
-            this.name = name;
-            this.description = description;
+            this.label = label;
             this.nodeName = nodeName;
         }
     }

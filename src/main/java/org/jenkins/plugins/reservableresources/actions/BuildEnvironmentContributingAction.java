@@ -16,47 +16,58 @@
  */
 package org.jenkins.plugins.reservableresources.actions;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import org.apache.commons.lang.StringUtils;
+import org.jenkins.plugins.reservableresources.model.NodePropertyExtension;
+import org.jenkins.plugins.reservableresources.model.NodePropertyExtension.Setting;
 
 import hudson.EnvVars;
-import hudson.model.AbstractBuild;
 import hudson.model.EnvironmentContributingAction;
 import hudson.model.InvisibleAction;
-import hudson.slaves.EnvironmentVariablesNodeProperty.Entry;
+import hudson.model.Node;
+import hudson.model.Run;
 
 public class BuildEnvironmentContributingAction extends InvisibleAction implements EnvironmentContributingAction {
 	
-	private final String variablePrefix;
+	private static final String NODE_NAME = "NODE_NAME";
+
+    private final String variablePrefix;
 	
 	private final String nodeName;
-	private final List<Entry> nodeEnvVariables;
+	private final List<Setting> nodeEnvVariables;
 	
 	public BuildEnvironmentContributingAction(
 	        final String variablePrefix,
-	        final String nodeName,
-	        final List<Entry> nodeEnvVariables) {
+	        final Node node) {
 
         super();
         
         this.variablePrefix = variablePrefix;
-        this.nodeName = nodeName;
-        this.nodeEnvVariables = nodeEnvVariables;
+        this.nodeName = node.getNodeName();
+        
+        this.nodeEnvVariables = Optional.ofNullable(
+                node.getNodeProperties().get(NodePropertyExtension.class))
+            .map(NodePropertyExtension::getSettings)
+            .orElse(new ArrayList<>());
     }
 	
     @Override
-    public void buildEnvVars(AbstractBuild<?, ?> build, EnvVars environmentVariables) {
-
+    public void buildEnvironment(
+            final Run<?, ?> run,
+            final EnvVars environmentVariables) {
+        
         String prefix = "";
         
         if (StringUtils.isNotBlank(variablePrefix)) {
             prefix = variablePrefix.endsWith("_") ? variablePrefix : variablePrefix + "_";
         }
             
-        environmentVariables.put(prefix + "NODE_NAME", nodeName);
+        environmentVariables.put(prefix + NODE_NAME, nodeName);
         
-        for (Entry envVariable : nodeEnvVariables) {
+        for (Setting envVariable : nodeEnvVariables) {
             environmentVariables.put(prefix + envVariable.key, envVariable.value);
         }
     }

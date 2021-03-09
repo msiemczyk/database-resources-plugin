@@ -9,7 +9,9 @@
 	<f:entry>
         <f:repeatable field="resources" minimum="1" add="${%Add resource}">
             <table width="100%">
-                <st:include page="config.jelly" class="org.jenkins.plugins.reservableresources.RequiredReservableResource"/>
+                <st:include page="config.jelly"
+                    class="org.jenkins.plugins.reservableresources.model.RequiredReservableResource"/>
+                    
                 <f:entry title="">
                     <div align="right"><f:repeatableDeleteButton/></div>
                 </f:entry>

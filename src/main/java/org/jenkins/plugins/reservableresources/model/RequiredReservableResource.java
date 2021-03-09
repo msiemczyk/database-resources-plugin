@@ -14,11 +14,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package org.jenkins.plugins.reservableresources;
+package org.jenkins.plugins.reservableresources.model;
 
 import java.util.stream.Stream;
 
 import org.apache.commons.lang.StringUtils;
+import org.jenkins.plugins.reservableresources.ReservableResourcesManager;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
 
@@ -94,7 +95,7 @@ public class RequiredReservableResource extends AbstractDescribableImpl<Required
             }
             
             if (resourceDoesNotExist(value)) {
-                return FormValidation.error("Therea are no reservable resources with label '" + value + ".");
+                return FormValidation.error("Therea are no reservable resources with label '" + value + "'.");
             }
             
             return FormValidation.ok();
@@ -110,8 +111,9 @@ public class RequiredReservableResource extends AbstractDescribableImpl<Required
             
             AutoCompletionCandidates candidates = new AutoCompletionCandidates();
             
-            ReservableResourcesManager.getInstance().getResources().stream()
+            ReservableResourcesManager.getInstance().getReservableNodes().stream()
                 .flatMap(node -> Stream.of(StringUtils.split(node.getLabelString())))
+                .distinct()
                 .filter(label -> StringUtils.containsIgnoreCase(label, value))
                 .forEach(candidates::add);
             
@@ -120,7 +122,7 @@ public class RequiredReservableResource extends AbstractDescribableImpl<Required
         
         private boolean resourceDoesNotExist(final String resourceLabel) {
 
-            return ReservableResourcesManager.getInstance().getResources().stream()
+            return ReservableResourcesManager.getInstance().getReservableNodes().stream()
                 .flatMap(node -> Stream.of(StringUtils.split(node.getLabelString())))
                 .noneMatch(resourceLabel::equals);
         }

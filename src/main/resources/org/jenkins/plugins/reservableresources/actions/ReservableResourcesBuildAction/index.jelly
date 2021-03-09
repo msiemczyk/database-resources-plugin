@@ -14,12 +14,12 @@
         <st:include page="sidepanel.jelly" it="${build}" />
         
         <l:main-panel>
-            <h1>${%Database Resources}</h1>
-            <p>This build has acquired the following database resources:</p>
+            <h1>${%Reservable Resources}</h1>
+            <p>This build has acquired the following resources:</p>
             <ul>
                 <j:forEach var="resource" items="${it.acquiredResources}">
                     <li>
-                        <strong>${resource.nodeName}</strong> from ${resource.name} (<em>${resource.description}</em>)
+                        <strong>${resource.nodeName}</strong> from ${resource.label}
                     </li>
                 </j:forEach>
             </ul>

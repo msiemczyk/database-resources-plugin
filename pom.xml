@@ -7,10 +7,10 @@
      
     <name>Reservable Resources</name>
     <description>
-        This Jenkins plugin allows to define reservale resources (databases, other servers needed, etc.) that
-        can be used by builds. If a build requires a resource which is already reserverd, the job will wait,
-        until defined time-out, for the resource to become free.
+        This Jenkins plugin allows to define nodes as reservale resources (databases, other servers needed, etc.)
+        that can be used by the build using manually defined label.
     </description>
+    <url>https://github.com/msiemczyk/reservable-resources-plugin</url>
     <inceptionYear>2021</inceptionYear>
 
     <parent>
@@ -150,5 +150,19 @@
             </plugins>
         </pluginManagement>
     </build>
+    
+    <developers>
+        <developer>
+            <id>msiemczyk</id>
+            <name>Maciek Siemczyk</name>
+            <email>msiemczyk@github</email>
+        </developer>
+    </developers>
+
+    <scm>
+        <connection>scm:git:https://github.com/msiemczyk/reservable-resources-plugin.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/msiemczyk/reservable-resources-plugin.git</developerConnection>
+        <url>https://github.com/msiemczyk/reservable-resources-plugin</url>
+    </scm>
     
 </project>

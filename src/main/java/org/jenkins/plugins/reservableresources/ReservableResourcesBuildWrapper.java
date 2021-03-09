@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019 Maciek Siemczyk
+ * Copyright (C) 2021 Maciek Siemczyk
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,15 +21,14 @@ import static org.jenkins.plugins.reservableresources.ReservableResourcesManager
 import java.io.IOException;
 import java.io.PrintStream;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 
 import org.jenkins.plugins.reservableresources.actions.BuildEnvironmentContributingAction;
 import org.jenkins.plugins.reservableresources.actions.ReservableResourcesBuildAction;
 import org.jenkins.plugins.reservableresources.actions.ReservableResourcesBuildAction.AcquiredResource;
+import org.jenkins.plugins.reservableresources.model.RequiredReservableResource;
 import org.kohsuke.stapler.DataBoundConstructor;
+import org.kohsuke.stapler.QueryParameter;
 
 import hudson.Extension;
 import hudson.Launcher;
@@ -37,11 +36,13 @@ import hudson.model.AbstractBuild;
 import hudson.model.BuildListener;
 import hudson.model.Descriptor;
 import hudson.model.Node;
-import hudson.slaves.EnvironmentVariablesNodeProperty;
+import hudson.model.Run;
 import hudson.tasks.BuildWrapper;
+import hudson.util.FormValidation;
 
 /**
- * TODO: might have to change this to QueueTaskDispatcher for better visibility.
+ * Reservable resources build wrapper is responsible for acquiring and releasing
+ * of the resources for the individual builds ({@link Run}).
  * 
  * @see BuildWrapper
  */
@@ -84,69 +85,54 @@ public class ReservableResourcesBuildWrapper extends BuildWrapper {
 
         final PrintStream logger = listener.getLogger();
         
-        Map<String, Node> reservedNodesByLabel = new HashMap<>();
         List<AcquiredResource> acquiredResources = new ArrayList<>(requiredResources.size());
-        
-        for (RequiredReservableResource requiredResource : requiredResources) {
-            final String label = requiredResource.getResourceLabel();
-            
-            logger.println(LOG_PREFIX + "Acquiring a resource from '" + label + "'...");
 
-            Node node = ReservableResourcesManager.getInstance().acquireResource(requiredResource, build); // timeoutInMinutes
-            reservedNodesByLabel.put(label, node);
-            
-            acquiredResources.add(
-                new AcquiredResource(
-                    label, 
-                    ReservableResourcesManager.getInstance().getResource(label).getDescription(),
-                    reservedNodesByLabel.get(label).getNodeName()));
-            
-            NodePropertyExtension nodeProperties = node.getNodeProperties().get(NodePropertyExtension.class);
-//                .map(NodePropertyExtension::getVmName)
-//                .orElse(node.getNodeName());
-            
-            nodeProperties.getSettings()
-            
-            if (nodeProperties.getCopyEnvVariables()) {
-                List<EnvironmentVariablesNodeProperty.Entry> nodeEnvVariables = Optional.ofNullable(
-                        node.getNodeProperties().get(EnvironmentVariablesNodeProperty.class))
-                    .map(EnvironmentVariablesNodeProperty::getEnv)
-                    .orElse(new ArrayList<>());
+        try {
+            for (RequiredReservableResource requiredResource : requiredResources) {
+                final String label = requiredResource.getResourceLabel();
+                
+                logger.println(LOG_PREFIX + "Acquiring a resource from '" + label + "'...");
+
+                Node node = ReservableResourcesManager.getInstance()
+                    .acquireResource(timeoutInMinutes, requiredResource, build);
+                
+                acquiredResources.add(new AcquiredResource(label, node.getNodeName()));
+                
+                build.addAction(new BuildEnvironmentContributingAction(requiredResource.getEnvVariablePrefix(), node));
+                
+                logger.println(
+                    LOG_PREFIX + "Successfully acquired '" + node.getNodeName() + "' from '" + label + "'.");
             }
-
-            build.addAction(new BuildEnvironmentContributingAction(
-                requiredResource.getEnvVariablePrefix(), node.getNodeName(), nodeEnvVariables));
             
-            logger.println(
-                LOG_PREFIX + "Successfully acquired '" + node.getNodeName() + "' from '" + label + "'.");
+            build.addAction(new ReservableResourcesBuildAction(acquiredResources));
         }
-        
-        build.addAction(new ReservableResourcesBuildAction(acquiredResources));
+        catch (Exception exception) {
+            releaseAcquiredResources(logger, acquiredResources);
+            
+            // Re-throw the exception or the build will proceed.
+            throw exception;
+        }
         
         return new Environment() {
             
             @Override
             public boolean tearDown(AbstractBuild build, BuildListener listener) throws IOException, InterruptedException {
 
-                for (Node lockedNode : reservedNodesByLabel.values()) {
-                    ReservableResourcesManager.getInstance().releaseResource(lockedNode);
-                    
-                    logger.println(LOG_PREFIX + "Released the '" + lockedNode.getNodeName() + "' resource.");
-                }
+                releaseAcquiredResources(logger, acquiredResources);
                 
                 return super.tearDown(build, listener);
             }
         };
     }
+    
+    private void releaseAcquiredResources(final PrintStream logger, List<AcquiredResource> acquiredResources) {
 
-//  public void setTimeoutInMinutes(long timeoutInMinutes) throws FormException {
-//
-//      if (timeoutInMinutes < 1) {
-//          throw new FormException("Given timeout in minutes must be a positive number.", "timeoutInMinutes");
-//      }
-//      
-//      this.timeoutInMinutes = timeoutInMinutes;
-//  }
+        for (AcquiredResource acquiredResource : acquiredResources) {
+            ReservableResourcesManager.getInstance().releaseResource(acquiredResource.nodeName);
+            
+            logger.println(LOG_PREFIX + "Released the '" + acquiredResource.nodeName + "' resource.");
+        }
+    }
     
     @Extension
     public static class DescriptorImpl extends Descriptor<BuildWrapper> {
@@ -160,6 +146,26 @@ public class ReservableResourcesBuildWrapper extends BuildWrapper {
         public int defaultTimeout() {
             
             return DEFAULT_TIMEOUT_IN_MINUTES;
+        }
+        
+        /**
+         * Checks that the time-out is given and is a positive number.
+         *
+         * @param value The string value to validate.
+         * 
+         * @return the validation results.
+         */
+        public FormValidation doCheckTimeoutInMinutes(
+                @QueryParameter
+                final String value) {
+           
+            final FormValidation validateRequired = FormValidation.validateRequired(value);
+            
+            if (validateRequired != FormValidation.ok()) {
+                return validateRequired;
+            }
+            
+            return FormValidation.validatePositiveInteger(value);
         }
     }
 }

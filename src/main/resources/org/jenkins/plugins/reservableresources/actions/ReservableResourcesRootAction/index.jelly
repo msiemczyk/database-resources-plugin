@@ -1,7 +1,34 @@
 <?jelly escape-by-default='true'?>
 <j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define"
         xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:f="/lib/form">
-      
+    
+    <style>
+        .nodes-table tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        
+        .nodes-table td.pane,
+        .nodes-table th {
+            padding: 10px;
+        }
+        
+        .queue-table th {
+            padding: 10px;
+        }
+        
+        * {
+          box-sizing: border-box;
+        }
+        
+        .row {
+          display: flex;
+        }
+        
+        .column {
+          padding: 5px;
+        }
+    </style>
+    
     <l:layout permission="${app.ADMINISTER}" title="Reservable Resources">
         <l:side-panel>
             <l:tasks>
@@ -12,78 +39,88 @@
         
         <l:main-panel>
             <h1>${%Reservable Resources}</h1>
-        
-            <j:forEach var="resource" items="${it.resourceInfos}" indexVar="i">
             
-                <div style="width: auto">
-                <l:pane width="1" id="resourceTable${i}"
-                        title="${resource.name} - &lt;em style='font-weight: normal' &gt;${resource.description}&lt;/em&gt;">
+            <p>
+                Manage and monitor reservable resources as defined in node properties.
+            </p>
+        
+            <j:forEach var="nodeInfosByLabel" items="${it.resourceInfos}">
+            
+                <l:pane width="1" id="resourcePool${i}" title="${nodeInfosByLabel.key}">
                     <tr>
-                        <td>
-                            <ul>
-                                <j:forEach var="nodeInfosByLabel" items="${resource.nodeInfosByLabel}">
+                        <td style="padding: 1em 25px 1em 25px">
+
+                                <div class="row">
+                                    <div class="column" style="flex: 30%">
+                            
+                                <table class="pane queue-table" style="border: 1px #bbb solid">
+                                    <tr>
+                                        <th class="pane-header" style="text-align: left">${%Build Queue}</th>
+                                    </tr>
+                                    <tr>
+                                        <td>Not implemented yet</td>
+                                    </tr>
+                                </table>
+                                
+                                </div>
+                                <div class="column" style="flex: 70%">
+  
+                                <table class="pane nodes-table" style="border: 1px #bbb solid">
+                                    <tr>
+                                        <th class="pane-header" style="width: 300px; text-align: left">${%Node}</th>
+                                        <th class="pane-header" style="text-align: left">${%Reserved by}</th>
+                                        <th class="pane-header" style="width: 100px; text-align: center">${%Actions}</th>
+                                    </tr>
                                     
-                                    <li>
-                                        <div>
-                                            ${nodeInfosByLabel.key}
-                                            
-                                            <div style="padding: 1em 50px 1em 25px">
-                                                <table class="pane" style="border: 1px #bbb solid">
-                                                    <tr>
-                                                        <td class="pane-header">${%Node}</td>
-                                                        <td class="pane-header" style="width: 100px; text-align: center">
-                                                            ${%Status}
-                                                        </td>
-                                                        <td class="pane-header" style="width: 100px; text-align: center">
-                                                            ${%Actions}
-                                                        </td>
-                                                    </tr>
+                                    <j:forEach var="nodeInfo" items="${nodeInfosByLabel.value}">
+                                        <tr>
+                                            <td class="pane">          
+                                                <l:icon class="${nodeInfo.computer.iconClassName} icon-md"/>
+                                                <st:nbsp/>
+                                                <t:node value="${nodeInfo.node}" />
+                                            </td>
+                                            <td class="pane">
+                                                <j:if test="${nodeInfo.reservedBy != null}">
+                                                    <j:choose>
+                                                        <j:when test="${nodeInfo.reservedBy.build != null}">
+                                                            <j:set var="url" value="${nodeInfo.reservedBy.url}" />
+                                                            
+                                                            <a href="${app.rootUrl}${url}">${nodeInfo.reservedBy.displayName}</a>
+                                                            <t:buildProgressBar build="${nodeInfo.reservedBy.build}" />
+                                                        </j:when>
+                                                        <j:otherwise>${nodeInfo.reservedBy.displayName}</j:otherwise>
+                                                    </j:choose>    
+                                                </j:if>
+                                            </td>
+                                            <td class="pane yui-button danger" style="text-align: center">
+                                                <form method="post" action="unreserve">
+                                                    <input type="hidden" name="nodeName" value="${nodeInfo.node.nodeName}" />
                                                     
-                                                    <j:forEach var="nodeInfo" items="${nodeInfosByLabel.value}">
-                                                        
-                                                        <tr>
-                                                            <td class="pane">
-                                                                <a href="../computer/${nodeInfo.name}">${nodeInfo.name}</a>
-                                                            </td>
-                                                            <td class="pane" style="text-align: center">
-                                                                <j:if test="${nodeInfo.isLocked}">
-                                                                    <img src="${rootURL}/plugin/database-resources/images/32x32/locked-icon.png"
-                                                                        height="24" width="24" alt="${%Node is locked}"
-                                                                        tooltip="${%Node is locked}" />
-                                                                </j:if>
-                                                            </td>
-                                                            <td class="pane yui-button danger" style="text-align: center">
-                                                                <form method="post" action="unlock">
-                                                                    <input type="hidden" name="nodeName" value="${nodeInfo.name}" />
-                                                                    
-                                                                    <div>
-                                                                        <j:choose>
-                                                                            <j:when test="${nodeInfo.isLocked}">
-                                                                                <button type="submit">Unlock</button>
-                                                                            </j:when>
-                                                                            <j:otherwise>
-                                                                                <button disabled="disabled">Unlock</button>
-                                                                            </j:otherwise>
-                                                                        </j:choose>
-                                                                    </div>
-                                                                </form>
-                                                            </td>
-                                                        </tr>
-                                                        
-                                                    </j:forEach>
-                                                    
-                                                </table>
-                                            </div>
-                                        </div>
-                                    </li>
+                                                    <div>
+                                                        <j:choose>
+                                                            <j:when test="${nodeInfo.reservedBy != null}">
+                                                                <button type="submit">Unreserve</button>
+                                                            </j:when>
+                                                            <j:otherwise>
+                                                                <!-- future 
+                                                                <button disabled="disabled">Reserve</button-->
+                                                            </j:otherwise>
+                                                        </j:choose>
+                                                    </div>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                    </j:forEach>
                                     
-                                </j:forEach>
-                            </ul>
+                                </table>
+                                
+                                </div>
+                                </div>
+                                
                         </td>
                     </tr>
                 </l:pane>
-                </div>
-                
+
             </j:forEach>
             
         </l:main-panel>
