@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019 Maciek Siemczyk
+ * Copyright (C) 2021 Maciek Siemczyk
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package org.jenkins.plugins.databaseresources.actions;
+package org.jenkins.plugins.reservableresources.actions;
 
 import java.util.List;
 
@@ -59,6 +59,5 @@ public class BuildEnvironmentContributingAction extends InvisibleAction implemen
         for (Entry envVariable : nodeEnvVariables) {
             environmentVariables.put(prefix + envVariable.key, envVariable.value);
         }
-        
     }
 }

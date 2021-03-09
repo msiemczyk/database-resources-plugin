@@ -1,0 +1,20 @@
+<?jelly escape-by-default='true'?>
+<j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define"
+	   xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:f="/lib/form">
+	
+    <f:entry title="${%Time-out}" field="timeoutInMinutes">
+        <f:number clazz="required positive-number" default="${descriptor.defaultTimeout()}" />
+    </f:entry>
+    
+	<f:entry>
+        <f:repeatable field="resources" minimum="1" add="${%Add resource}">
+            <table width="100%">
+                <st:include page="config.jelly" class="org.jenkins.plugins.reservableresources.RequiredReservableResource"/>
+                <f:entry title="">
+                    <div align="right"><f:repeatableDeleteButton/></div>
+                </f:entry>
+            </table>
+        </f:repeatable>
+    </f:entry>
+	
+</j:jelly>
