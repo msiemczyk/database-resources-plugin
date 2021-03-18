@@ -17,23 +17,31 @@
 package org.jenkins.plugins.reservableresources;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Random;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 import javax.annotation.Nonnull;
 
+import org.apache.commons.lang.StringUtils;
 import org.jenkins.plugins.reservableresources.model.NodePropertyExtension;
 import org.jenkins.plugins.reservableresources.model.RequiredReservableResource;
 
 import hudson.model.AbstractBuild;
-import hudson.model.Executor;
 import hudson.model.Node;
-import hudson.model.Result;
 import jenkins.model.Jenkins;
 
 /**
@@ -45,9 +53,10 @@ public class ReservableResourcesManager {
     private static final Logger log = Logger.getLogger(ReservableResourcesManager.class.getName());
     
     public static final String LOG_PREFIX = "[reservable-resources] ";
-    
+   
+    private final Map<String, BuildQueue> buildQueuesByLabel = new ConcurrentHashMap<>();
     private final Map<String, ReservedResource> reservedByNodeName = new ConcurrentHashMap<>();
-
+    
     /**
      * Private constructor to prevent instantiation.
      */
@@ -55,7 +64,18 @@ public class ReservableResourcesManager {
     
     }
     
-    public synchronized Node acquireResource(
+    /**
+     * Acquire a reservable resource.
+     * 
+     * @param timeoutInMinutes Integer representing maximum wait time to acquire the resource.
+     * @param requiredResource Metadata information about required resource.
+     * @param build Reference to {@link AbstractBuild} object that is reserving this resource.
+     * 
+     * @return Reference to acquired {@link Node}; never null.
+     * 
+     * @throws InterruptedException if build is aborted.
+     */
+    public Node acquireResource(
             final int timeoutInMinutes,
             final RequiredReservableResource requiredResource,
             final AbstractBuild<?, ?> build) throws InterruptedException {
@@ -69,23 +89,68 @@ public class ReservableResourcesManager {
         if (reservableNodes.isEmpty()) {
             throw new IllegalArgumentException("The are no reservable nodes with label '" + label + "'.");
         }
-        
-        Node availableNode = acquireAvailableNode(timeoutInMinutes, label, reservableNodes, build);
-        
-        reservedByNodeName.put(
-            availableNode.getNodeName(),
-            new ReservedResource(availableNode, build));
-        
-        return availableNode;
+
+        setBuildDescription(
+            build,
+            "Waiting for next available resource from '" + label + "'...");
+
+        try {
+            Node node = buildQueuesByLabel.computeIfAbsent(label, k -> new BuildQueue(label))
+                .acquireAvailableNode(timeoutInMinutes, build);
+            
+            setBuildDescription(build, "");
+            
+            return node;
+        }
+        catch (TimeoutException exception) {
+            setBuildDescription(
+                build,
+                "Aborted waiting for resource due to reaching time-out of " + timeoutInMinutes + " minutes.");
+            
+            // TODO: figure out how to print to console when aborting due to time-out
+//            abortBuild(build);
+            throw new InterruptedException("Reservable resource maximum wait time reached.");
+        }
     }
 
+    /**
+     * Manually reserve a node resource.
+     * 
+     * @param nodeName String representing node name of the resource.
+     * 
+     * @throws IllegalArgumentException if resource with given node name does not exit.
+     * @throws IllegalStateException if the resource is already reserved.
+     */
+    public void reserveResource(final String nodeName) {
+        
+        Node node = Jenkins.get().getNodes().stream()
+            .filter(unfilteredNode -> unfilteredNode.getNodeProperty(NodePropertyExtension.class) != null)
+            .filter(resourceNode -> resourceNode.getNodeName().equals(nodeName))
+            .findFirst()
+            .orElseThrow(() -> new IllegalArgumentException("There is no node resource with given name."));
+                
+        synchronized (reservedByNodeName) {
+            if (reservedByNodeName.containsKey(nodeName)) {
+                throw new IllegalStateException("Resource with node name '" + nodeName + "' is already reserved.");
+            }
+            
+            reservedByNodeName.put(nodeName, new ReservedResource(node, Jenkins.getAuthentication().getName()));    
+        }
+    }
+    
     /**
      * Releases reserved resource.
      * 
      * @param nodeName String representing node name of the resource.
+     * 
+     * @throws IllegalArgumentException if given node name is blank.
      */
     public synchronized void releaseResource(final String nodeName) {
 
+        if (StringUtils.isBlank(nodeName)) {
+            throw new IllegalArgumentException("Given node name is blank.");
+        }
+        
         reservedByNodeName.remove(nodeName);
     }
     
@@ -101,6 +166,15 @@ public class ReservableResourcesManager {
         return Optional.ofNullable(reservedByNodeName.get(node.getNodeName())); 
     }
     
+    @SuppressWarnings("java:S1452")
+    public List<AbstractBuild<?, ?>> getBuildQueueBuilds(final String nodeLabelString) {
+        
+        return buildQueuesByLabel.values().stream()
+            .filter(queue -> nodeLabelString.contains(queue.label))
+            .flatMap(filteredQueue -> filteredQueue.getQueueBuilds().stream())
+            .collect(Collectors.toList());
+    }
+    
     private List<Node> getReservableNodes(String resourceLabel) {
 
         return Jenkins.get().getNodes().stream()
@@ -109,41 +183,6 @@ public class ReservableResourcesManager {
             .collect(Collectors.toList());
     }
     
-    private Node acquireAvailableNode(
-            int timeoutInMinutes,
-            String resourceLabel,
-            List<Node> reservableNodes,
-            AbstractBuild<?,?> build) throws InterruptedException {
-
-        long timeoutInMs = TimeUnit.MINUTES.toMillis(timeoutInMinutes);
-        long startTime = System.currentTimeMillis();
-        
-        while (true) {
-            List<Node> availableNodes = reservableNodes.stream()
-                .filter(node -> node.toComputer().isOnline())
-                .filter(filteredNode -> !reservedByNodeName.containsKey(filteredNode.getNodeName()))
-                .collect(Collectors.toList());
-        
-            if (availableNodes.isEmpty()) {
-                setBuildDescription(
-                    build,
-                    "Waiting for next available resource from '" + resourceLabel + "'...");
-                
-                if ((System.currentTimeMillis() - startTime) > timeoutInMs) {
-                    // TODO: figure out how to print to console when aborting due to time-out
-                    abortBuild(build);
-                }
-                
-                TimeUnit.SECONDS.sleep(5);
-                continue;
-            }
-            
-            setBuildDescription(build, "");
-            
-            return availableNodes.get(0);
-        }
-    }
-
     private void setBuildDescription(
             final AbstractBuild<?, ?> build,
             final String description) {
@@ -155,16 +194,16 @@ public class ReservableResourcesManager {
         }
     }
 
-    private void abortBuild(final AbstractBuild<?, ?> build) throws InterruptedException {
-
-        Executor executor = build.getExecutor();
-        
-        if (executor == null) {
-            throw new InterruptedException("Reservable resource maximum wait time reached.");
-        }
-        
-        executor.interrupt(Result.FAILURE);
-    }
+//    private void abortBuild(final AbstractBuild<?, ?> build) throws InterruptedException {
+//
+//        Executor executor = build.getExecutor();
+//        
+//        if (executor == null) {
+//            throw new InterruptedException("Reservable resource maximum wait time reached.");
+//        }
+//        
+//        executor.interrupt(Result.FAILURE);
+//    }
     
     /**
      * Singleton instance.
@@ -185,43 +224,129 @@ public class ReservableResourcesManager {
 
         return instance;
     }
+        
+    private final class BuildQueue {
     
-    public static final class ReservedResource {
+        private final String label;
+        private final BlockingQueue<AcquireTask> queue = new LinkedBlockingQueue<>();
         
-        public final Node node;
-        public final ReservedBy reservedBy;
+        private final ExecutorService executor = Executors.newSingleThreadExecutor();
         
-        public ReservedResource(
-                Node node,
-                AbstractBuild<?, ?> build) {
+        private AcquireTask currentAcquireTask;
+        
+        public BuildQueue(String label) {
 
-            this.node = node;
-            this.reservedBy = new ReservedBy(build.toString(), build);
+            this.label = label;
+            
+            executor.execute(() -> {
+                                
+                while (true) {
+                    try {
+                        currentAcquireTask = queue.take();
+                        
+                        handOutNextAvailableNode(label, currentAcquireTask);
+                    }
+                    catch (InterruptedException exception) {
+                        Thread.currentThread().interrupt();
+                    }
+                    catch (Exception ignoreException) {
+                        // Don't stop polling if there are other other exception.
+                    }
+                    finally {
+                        currentAcquireTask = null;
+                    }
+                }
+            });
         }
         
-        public static final class ReservedBy {
+        @SuppressWarnings("java:S1452")
+        public List<AbstractBuild<?, ?>> getQueueBuilds() {
             
-            private final String displayName;
-            private final AbstractBuild<?, ?> build;
+            List<AbstractBuild<?, ?>> builds = new ArrayList<>();
             
-            public ReservedBy(
-                    String displayName,
-                    AbstractBuild<?,?> build) {
-
-                this.displayName = displayName;
-                this.build = build;
+            if (currentAcquireTask != null) {
+                builds.add(currentAcquireTask.build);
             }
+            
+            builds.addAll(queue.stream().map(AcquireTask::getBuild).collect(Collectors.toList()));
+            
+            return builds;
+        }
+        
+        public Node acquireAvailableNode(
+                int timeoutInMinutes,
+                AbstractBuild<?, ?> build) throws InterruptedException, TimeoutException {
 
-            public String getDisplayName() {
-
-                return displayName;
+            AcquireTask acquireTask = new AcquireTask(build);
+            
+            queue.add(acquireTask);
+            
+            try {
+                return acquireTask.get(timeoutInMinutes, TimeUnit.MINUTES);
             }
-
-            @SuppressWarnings("java:S1452")
-            public AbstractBuild<?, ?> getBuild() {
-
-                return build;
+            catch (ExecutionException exception) {
+                // This shouldn't really happen
+                throw new InterruptedException(exception.getMessage());
             }
+            finally {
+                queue.remove(acquireTask);
+            }
+        }
+        
+        private void handOutNextAvailableNode(
+                String label,
+                AcquireTask acquireTask) throws InterruptedException {
+
+            while (acquireTask.build.isBuilding()) {
+                List<Node> availableNodes = getReservableNodes(label).stream()
+                    .filter(node -> node.toComputer().isOnline())
+                    .filter(filteredNode -> !reservedByNodeName.containsKey(filteredNode.getNodeName()))
+                    .collect(Collectors.toList());
+                
+                if (availableNodes.isEmpty()) {
+                    TimeUnit.SECONDS.sleep(5);
+                    continue;
+                }
+
+                Node availableNode = availableNodes.get(new Random().nextInt(availableNodes.size()));
+                
+                synchronized (reservedByNodeName) {
+                    if (reservedByNodeName.containsKey(availableNode.getNodeName())) {
+                        continue;
+                    }
+                    
+                    reservedByNodeName.put(
+                        availableNode.getNodeName(),
+                        new ReservedResource(availableNode, acquireTask.build));
+                }
+
+                acquireTask.setNode(availableNode);
+                return;
+            }
+            
+        }
+    }
+    
+    private static final class AcquireTask extends FutureTask<Node> {
+
+        private final AbstractBuild<?, ?> build;
+        
+        public AcquireTask(AbstractBuild<?,?> build) {
+
+            super(() -> null);
+            
+            this.build = build;
+        }
+
+        @SuppressWarnings("java:S1452")
+        public AbstractBuild<?, ?> getBuild() {
+
+            return build;
+        }
+
+        public void setNode(Node node) {
+
+            this.set(node);
         }
     }
 }

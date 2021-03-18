@@ -16,21 +16,23 @@
  */
 package org.jenkins.plugins.reservableresources.actions;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-import org.apache.commons.lang.StringUtils;
 import org.jenkins.plugins.reservableresources.ReservableResourcesManager;
-import org.jenkins.plugins.reservableresources.ReservableResourcesManager.ReservedResource;
-import org.jenkins.plugins.reservableresources.ReservableResourcesManager.ReservedResource.ReservedBy;
+import org.jenkins.plugins.reservableresources.ReservedResource;
+import org.jenkins.plugins.reservableresources.ReservedResource.ReservedBy;
 import org.kohsuke.stapler.HttpResponse;
 import org.kohsuke.stapler.HttpResponses;
 import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.verb.POST;
 
 import hudson.Extension;
+import hudson.model.AbstractBuild;
 import hudson.model.Computer;
 import hudson.model.Node;
 import hudson.model.RootAction;
@@ -57,28 +59,60 @@ public class ReservableResourcesRootAction implements RootAction {
     }
     
     @POST
-    public HttpResponse doUnreserve(
+    public HttpResponse doReserve(
             @QueryParameter
             final String nodeName) {
         
-        if (StringUtils.isBlank(nodeName)) {
-            throw new IllegalArgumentException("Node name parameter is blank.");
-        }
-
+        ReservableResourcesManager.getInstance().reserveResource(nodeName);
+        
+        return HttpResponses.forwardToPreviousPage(); 
+    }
+    
+    @POST
+    public HttpResponse doRelease(
+            @QueryParameter
+            final String nodeName) {
+        
         ReservableResourcesManager.getInstance().releaseResource(nodeName);
         
         return HttpResponses.forwardToPreviousPage(); 
     }
 
-    public static Map<String, List<ResourceInfo>> getResourceInfos() {
+    public static Map<String, LabelInfo> getInfosByLabel() {
 
-        return ReservableResourcesManager.getInstance().getReservableNodes().stream()
+        Map<String, List<ResourceInfo>> resourcesInfosByLabel = ReservableResourcesManager.getInstance().getReservableNodes()
+            .stream()
             .collect(Collectors.groupingBy(
                 Node::getLabelString,
                 Collectors.mapping(node -> new ResourceInfo(
                         node,
                         ReservableResourcesManager.getInstance().getReservedInfo(node)),
                     Collectors.toList())));
+        
+        Map<String, LabelInfo> labelInfos = new HashMap<>(resourcesInfosByLabel.size());
+        
+        for (Entry<String, List<ResourceInfo>> entry : resourcesInfosByLabel.entrySet()) {
+            List<AbstractBuild<?, ?>> queueBuilds =
+                ReservableResourcesManager.getInstance().getBuildQueueBuilds(entry.getKey());
+            
+            labelInfos.put(entry.getKey(), new LabelInfo(queueBuilds, entry.getValue()));
+        }
+        
+        return labelInfos;
+    }
+    
+    public static final class LabelInfo {
+     
+        public final List<AbstractBuild<?, ?>> buildQueue;
+        public final List<ResourceInfo> resourceInfos;
+        
+        public LabelInfo(
+                List<AbstractBuild<?, ?>> buildQueue,
+                List<ResourceInfo> resourceInfos) {
+
+            this.buildQueue = buildQueue;
+            this.resourceInfos = resourceInfos;
+        }        
     }
     
     public static final class ResourceInfo {
@@ -94,7 +128,7 @@ public class ReservableResourcesRootAction implements RootAction {
 
             this.node = node;
             this.computer = node.toComputer();
-            this.reservedBy = reservedResource.map(resource -> resource.reservedBy).orElse(null);
+            this.reservedBy = reservedResource.map(ReservedResource::getReservedBy).orElse(null);
         }
 
         public Node getNode() {
