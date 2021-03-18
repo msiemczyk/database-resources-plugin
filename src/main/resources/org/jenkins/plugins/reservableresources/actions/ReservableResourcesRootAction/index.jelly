@@ -1,0 +1,169 @@
+<?jelly escape-by-default='true'?>
+<j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define"
+        xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:f="/lib/form">
+    
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        
+        .row {
+            display: flex;
+        }
+        
+        .column {
+            padding: 5px;
+        }
+        
+        .icon-button:focus,
+        .icon-button:hover {
+            transform: scale(1.5);
+        }
+        
+        .nodes-table tbody tr:nth-child(even) {
+            background-color: #fbfbfb;
+        }
+        
+        .nodes-table tbody tr:hover {
+            background-color: #e8e8e8
+        }
+
+        .nodes-table th,
+        .nodes-table td.pane {
+            padding: 10px;
+        }
+        
+        .queue-table th {
+            padding: 10px;
+        }
+        
+        .pane.queue-table td {
+            padding-left: 10px;
+            padding-right: 10px;
+        }
+    </style>
+    
+    <l:layout permission="${app.ADMINISTER}" title="Reservable Resources">
+        <l:side-panel>
+            <l:tasks>
+                <l:task icon="images/24x24/up.gif" href="${rootURL}/"
+                    title="${%Back to Dashboard}" />
+            </l:tasks>
+        </l:side-panel>
+        
+        <l:main-panel>
+            <h1>${%Reservable Resources}</h1>
+            
+            <p>
+                Manage and monitor reservable resources as defined in node properties.
+            </p>
+        
+            <j:forEach var="infoEntry" items="${it.infosByLabel}">
+            
+                <l:pane width="1" id="resourcePool${i}" title="${infoEntry.key}">
+                    <tr>
+                        <td style="padding: 1em 25px 1em 25px">
+
+                            <div class="row">
+                                <div class="column" style="flex: 30%">
+                            
+                                    <table class="pane queue-table" style="border: 1px #bbb solid">
+                                        <tr>
+                                            <th class="pane-header" style="text-align: left">${%Build Queue}</th>
+                                        </tr>
+                                        <j:choose>
+                                            <j:when test="${!infoEntry.value.buildQueue.isEmpty()}">
+                                                <j:forEach var="build" items="${infoEntry.value.buildQueue}">
+                                                    <tr>
+                                                        <td>
+                                                            <a href="${app.rootUrl}${build.url}">${build}</a>
+                                                            <t:buildProgressBar build="${build}" />
+                                                        </td>
+                                                    </tr>
+                                                </j:forEach>
+                                            </j:when>
+                                            <j:otherwise>
+                                                <tr>
+                                                    <td><st:nbsp/></td>
+                                                </tr>
+                                            </j:otherwise>
+                                        </j:choose>
+                                        
+                                    </table>
+                                
+                                </div>
+                                <div class="column" style="flex: 70%">
+  
+                                    <table class="pane nodes-table" style="border: 1px #bbb solid">
+                                        <thead>
+                                            <tr>
+                                                <th class="pane-header" style="width: 300px; text-align: left">${%Node}</th>
+                                                <th class="pane-header" style="text-align: left">${%Reserved by}</th>
+                                                <th class="pane-header" style="width: 100px; text-align: center">${%Actions}</th>
+                                            </tr>
+                                        </thead>
+                                        
+                                        <tbody>
+                                            <j:forEach var="info" items="${infoEntry.value.resourceInfos}">
+                                                <tr>
+                                                    <td class="pane">          
+                                                        <l:icon class="${info.computer.iconClassName} icon-md"/>
+                                                        <st:nbsp/>
+                                                        <t:node value="${info.node}" />
+                                                    </td>
+                                                    <td class="pane">
+                                                        <j:if test="${info.reservedBy != null}">
+                                                            <j:choose>
+                                                                <j:when test="${info.reservedBy.build != null}">
+                                                                    <j:set var="url" value="${info.reservedBy.url}" />
+                                                                    
+                                                                    <a href="${app.rootUrl}${url}">${info.reservedBy.displayName}</a>
+                                                                    <t:buildProgressBar build="${info.reservedBy.build}" />
+                                                                </j:when>
+                                                                <j:otherwise>${info.reservedBy.displayName}</j:otherwise>
+                                                            </j:choose>
+                                                        </j:if>
+                                                    </td>
+                                                    <td class="pane" style="text-align: center">    
+                                                        <div>
+                                                            <j:choose>
+                                                                <j:when test="${info.reservedBy != null}">
+                                                                    <j:if test="${info.reservedBy.build == null}">
+                                                                        <form method="post" action="release">
+                                                                            <input type="hidden" name="nodeName" value="${info.node.nodeName}" />
+                                                            
+                                                                            <input type="image" alt="release" height="24" width="24"
+                                                                                src="${rootURL}/plugin/reservable-resources/images/unlock.png"
+                                                                                class="icon-button" tooltip="Release this resource"></input>
+                                                                        </form>
+                                                                    </j:if>
+                                                                </j:when>
+                                                                <j:otherwise>
+                                                                    <form method="post" action="reserve">
+                                                                        <input type="hidden" name="nodeName" value="${info.node.nodeName}" />
+                                                        
+                                                                        <input type="image" alt="reserve" height="24" width="24"
+                                                                            src="${rootURL}/plugin/reservable-resources/images/lock.png"
+                                                                            class="icon-button" tooltip="Reserve this resource"></input>
+                                                                    </form>
+                                                                </j:otherwise>
+                                                            </j:choose>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            </j:forEach>
+                                        </tbody>
+                                    </table>
+                                
+                                </div>
+                            </div>
+                                
+                        </td>
+                    </tr>
+                </l:pane>
+
+            </j:forEach>
+            
+        </l:main-panel>
+    </l:layout>
+</j:jelly>

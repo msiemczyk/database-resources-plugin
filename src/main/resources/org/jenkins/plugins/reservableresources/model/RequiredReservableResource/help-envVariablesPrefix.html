@@ -1,0 +1,20 @@
+<div>
+	<p>
+	   The names of all environment variables added by this plugin are prefixed with this string.
+	   Since the reserved Node name is always injected this field is required. 
+	</p>
+	<p>
+		e.g.: default "DB" prefix will produce this environment variable name
+		<pre>
+            DB_NODE_NAME or DB_SETTING_1
+		</pre>
+	</p>
+	<p>
+		Environment variables defined here will be made available to every build executed by this agent,
+		and will override any environment variables that have the same Name . 
+    </p>
+    <p>
+        Using the syntax $NAME or ${NAME} (%NAME% on Windows), these variables can be used in job 
+        configurations, or from process launched by a build.
+    </p>
+</div>

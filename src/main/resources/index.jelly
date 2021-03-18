@@ -1,6 +1,6 @@
 <?jelly escape-by-default='true'?>
 <div>
-  This plugin allows to define external database resources (like Oracle RDMS)
-  that can be locked by builds. If there are no available nodes belonging to
-  a resource the build will wait for the resource to become free.
+  This plugin allows to define dumb slave nodes as reservable resources (databases, other servers needed, etc.) 
+  that can be used by the build using a manually defined label. The resources can also have additional key/value
+  settings that are injected as environment variables.
 </div>
