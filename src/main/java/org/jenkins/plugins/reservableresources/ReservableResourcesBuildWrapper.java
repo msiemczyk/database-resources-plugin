@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeoutException;
 
 import org.jenkins.plugins.reservableresources.actions.BuildEnvironmentContributingAction;
 import org.jenkins.plugins.reservableresources.actions.ReservableResourcesBuildAction;
@@ -35,7 +36,9 @@ import hudson.Launcher;
 import hudson.model.AbstractBuild;
 import hudson.model.BuildListener;
 import hudson.model.Descriptor;
+import hudson.model.Executor;
 import hudson.model.Node;
+import hudson.model.Result;
 import hudson.model.Run;
 import hudson.tasks.BuildWrapper;
 import hudson.util.FormValidation;
@@ -93,6 +96,10 @@ public class ReservableResourcesBuildWrapper extends BuildWrapper {
                 
                 logger.println(LOG_PREFIX + "Acquiring a resource from '" + label + "'...");
 
+                setBuildDescription(
+                    build,
+                    "Waiting for next available resource from '" + label + "'...");
+                
                 Node node = ReservableResourcesManager.getInstance()
                     .acquireResource(timeoutInMinutes, requiredResource, build);
                 
@@ -104,7 +111,21 @@ public class ReservableResourcesBuildWrapper extends BuildWrapper {
                     LOG_PREFIX + "Successfully acquired '" + node.getNodeName() + "' from '" + label + "'.");
             }
             
+            setBuildDescription(build, "");
+            
             build.addAction(new ReservableResourcesBuildAction(acquiredResources));
+        }
+        catch (TimeoutException exception) {
+            final String message = "Aborted waiting for resource due "
+                + "to reaching time-out of " + timeoutInMinutes + " minutes.";
+            
+            logger.println(LOG_PREFIX + message);
+            
+            releaseAcquiredResources(logger, acquiredResources);
+            
+            setBuildDescription(build, message);
+            abortBuild(build, message);
+            return null;
         }
         catch (Exception exception) {
             releaseAcquiredResources(logger, acquiredResources);
@@ -134,6 +155,31 @@ public class ReservableResourcesBuildWrapper extends BuildWrapper {
         }
     }
     
+    private void setBuildDescription(
+            final AbstractBuild<?, ?> build,
+            final String description) {
+    
+        try {
+            build.setDescription(description);
+        } catch (IOException ignoreException) {
+            // Not much we can do with this exception so ignore it.
+        }
+    }
+    
+    private void abortBuild(
+            final AbstractBuild<?, ?> build,
+            final String message) throws InterruptedException {
+
+        Executor executor = build.getExecutor();
+
+        if (executor == null) {
+            throw new InterruptedException(message);
+        }
+
+        // TODO: in the future maybe add CauseOfInterruption argument
+        executor.interrupt(Result.FAILURE);
+    }
+
     @Extension
     public static class DescriptorImpl extends Descriptor<BuildWrapper> {
 

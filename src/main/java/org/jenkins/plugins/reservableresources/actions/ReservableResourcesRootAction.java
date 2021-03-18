@@ -80,14 +80,14 @@ public class ReservableResourcesRootAction implements RootAction {
 
     public static Map<String, LabelInfo> getInfosByLabel() {
 
-        Map<String, List<ResourceInfo>> resourcesInfosByLabel = ReservableResourcesManager.getInstance().getReservableNodes()
-            .stream()
-            .collect(Collectors.groupingBy(
-                Node::getLabelString,
-                Collectors.mapping(node -> new ResourceInfo(
-                        node,
-                        ReservableResourcesManager.getInstance().getReservedInfo(node)),
-                    Collectors.toList())));
+        Map<String, List<ResourceInfo>> resourcesInfosByLabel =
+            ReservableResourcesManager.getInstance().getReservableNodes().stream()
+                .collect(Collectors.groupingBy(
+                    Node::getLabelString,
+                    Collectors.mapping(node -> new ResourceInfo(
+                            node,
+                            ReservableResourcesManager.getInstance().getReservedInfo(node)),
+                        Collectors.toList())));
         
         Map<String, LabelInfo> labelInfos = new HashMap<>(resourcesInfosByLabel.size());
         
@@ -117,10 +117,10 @@ public class ReservableResourcesRootAction implements RootAction {
     
     public static final class ResourceInfo {
         
-        private final Node node;
-        private final Computer computer;
+        public final Node node;
+        public final Computer computer;
         
-        private final ReservedBy reservedBy;
+        public final ReservedBy reservedBy;
         
         public ResourceInfo(
                 Node node,
@@ -129,21 +129,6 @@ public class ReservableResourcesRootAction implements RootAction {
             this.node = node;
             this.computer = node.toComputer();
             this.reservedBy = reservedResource.map(ReservedResource::getReservedBy).orElse(null);
-        }
-
-        public Node getNode() {
-        
-            return node;
-        }
-        
-        public Computer getComputer() {
-
-            return computer;
-        }
-
-        public ReservedBy getReservedBy() {
-        
-            return reservedBy;
         }
     }
 }

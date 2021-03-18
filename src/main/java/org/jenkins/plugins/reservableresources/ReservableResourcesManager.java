@@ -16,7 +16,6 @@
  */
 package org.jenkins.plugins.reservableresources;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -31,6 +30,7 @@ import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
@@ -74,11 +74,12 @@ public class ReservableResourcesManager {
      * @return Reference to acquired {@link Node}; never null.
      * 
      * @throws InterruptedException if build is aborted.
+     * @throws TimeoutException if build is aborted due to a time-out.
      */
     public Node acquireResource(
             final int timeoutInMinutes,
             final RequiredReservableResource requiredResource,
-            final AbstractBuild<?, ?> build) throws InterruptedException {
+            final AbstractBuild<?, ?> build) throws InterruptedException, TimeoutException {
 
         log.fine("About to acquire " + requiredResource + ".");
         
@@ -89,28 +90,9 @@ public class ReservableResourcesManager {
         if (reservableNodes.isEmpty()) {
             throw new IllegalArgumentException("The are no reservable nodes with label '" + label + "'.");
         }
-
-        setBuildDescription(
-            build,
-            "Waiting for next available resource from '" + label + "'...");
-
-        try {
-            Node node = buildQueuesByLabel.computeIfAbsent(label, k -> new BuildQueue(label))
-                .acquireAvailableNode(timeoutInMinutes, build);
-            
-            setBuildDescription(build, "");
-            
-            return node;
-        }
-        catch (TimeoutException exception) {
-            setBuildDescription(
-                build,
-                "Aborted waiting for resource due to reaching time-out of " + timeoutInMinutes + " minutes.");
-            
-            // TODO: figure out how to print to console when aborting due to time-out
-//            abortBuild(build);
-            throw new InterruptedException("Reservable resource maximum wait time reached.");
-        }
+        
+        return buildQueuesByLabel.computeIfAbsent(label, k -> new BuildQueue(label))
+            .acquireAvailableNode(timeoutInMinutes, build);
     }
 
     /**
@@ -169,41 +151,30 @@ public class ReservableResourcesManager {
     @SuppressWarnings("java:S1452")
     public List<AbstractBuild<?, ?>> getBuildQueueBuilds(final String nodeLabelString) {
         
-        return buildQueuesByLabel.values().stream()
+        List<AbstractBuild<?, ?>> queueBuilds = buildQueuesByLabel.values().stream()
             .filter(queue -> nodeLabelString.contains(queue.label))
             .flatMap(filteredQueue -> filteredQueue.getQueueBuilds().stream())
             .collect(Collectors.toList());
+        
+        log.log(
+            Level.FINEST,
+            "Got following builds {0} for node label string {1}.",
+            new Object[] { queueBuilds, nodeLabelString });
+        
+        return queueBuilds;
     }
     
     private List<Node> getReservableNodes(String resourceLabel) {
 
-        return Jenkins.get().getNodes().stream()
+        List<Node> reservableNodes = Jenkins.get().getNodes().stream()
             .filter(node -> node.getNodeProperty(NodePropertyExtension.class) != null)
             .filter(reservableNode -> reservableNode.getLabelString().contains(resourceLabel))
             .collect(Collectors.toList());
+        
+        log.log(Level.FINEST, "Got reservable resources {0}.", reservableNodes);
+        
+        return reservableNodes;
     }
-    
-    private void setBuildDescription(
-            final AbstractBuild<?, ?> build,
-            final String description) {
-
-        try {
-            build.setDescription(description);
-        } catch (IOException ignoreException) {
-            // Not much we can do with this exception so ignore it.
-        }
-    }
-
-//    private void abortBuild(final AbstractBuild<?, ?> build) throws InterruptedException {
-//
-//        Executor executor = build.getExecutor();
-//        
-//        if (executor == null) {
-//            throw new InterruptedException("Reservable resource maximum wait time reached.");
-//        }
-//        
-//        executor.interrupt(Result.FAILURE);
-//    }
     
     /**
      * Singleton instance.
@@ -232,7 +203,8 @@ public class ReservableResourcesManager {
         
         private final ExecutorService executor = Executors.newSingleThreadExecutor();
         
-        private AcquireTask currentAcquireTask;
+        @SuppressWarnings("java:S3077")
+        private volatile AcquireTask currentAcquireTask;
         
         public BuildQueue(String label) {
 
@@ -285,11 +257,14 @@ public class ReservableResourcesManager {
                 return acquireTask.get(timeoutInMinutes, TimeUnit.MINUTES);
             }
             catch (ExecutionException exception) {
-                // This shouldn't really happen
+                // This shouldn't really happen with current code.
                 throw new InterruptedException(exception.getMessage());
             }
             finally {
-                queue.remove(acquireTask);
+                // Remove the task from the queue (if it still there) or reset current task.
+                if (!queue.remove(acquireTask)) {
+                    currentAcquireTask = null;    
+                }
             }
         }
         
@@ -304,13 +279,18 @@ public class ReservableResourcesManager {
                     .collect(Collectors.toList());
                 
                 if (availableNodes.isEmpty()) {
-                    TimeUnit.SECONDS.sleep(5);
+                    TimeUnit.SECONDS.sleep(1);
                     continue;
                 }
 
                 Node availableNode = availableNodes.get(new Random().nextInt(availableNodes.size()));
                 
                 synchronized (reservedByNodeName) {
+                    // The build was aborted if current task is null.
+                    if (currentAcquireTask == null) {
+                        return;
+                    }
+                    
                     if (reservedByNodeName.containsKey(availableNode.getNodeName())) {
                         continue;
                     }
