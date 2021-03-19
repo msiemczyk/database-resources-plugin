@@ -170,7 +170,6 @@
         <connection>scm:git:https://github.com/msiemczyk/reservable-resources-plugin.git</connection>
         <developerConnection>scm:git:ssh://git@github.com/msiemczyk/reservable-resources-plugin.git</developerConnection>
         <url>https://github.com/msiemczyk/reservable-resources-plugin</url>
-      <tag>v1.0.0</tag>
   </scm>
     
     <repositories>
