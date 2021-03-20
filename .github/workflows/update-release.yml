@@ -36,7 +36,7 @@ jobs:
       - uses: actions/github-script@v3
         id: set-result
         with:
-          script: return "Hello!"
+          script: return "${{ github.ref }}".substring(1)
           result-encoding: string
       - name: Get result
         run: echo "${{steps.set-result.outputs.result}}"
@@ -50,7 +50,7 @@ jobs:
         
       - name: Upload Release Asset
         id: upload-release-asset 
-        uses: actions/upload-release-asset@v1
+        uses: msiemczyk/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
