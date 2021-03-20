@@ -28,7 +28,7 @@ jobs:
       - id: parse-version
         uses: actions/github-script@v3
         with:
-          script: return context
+          script: return context.ref
           result-encoding: string
       - name: Context result
         run: echo "${{steps.parse-version.outputs.result}}"
