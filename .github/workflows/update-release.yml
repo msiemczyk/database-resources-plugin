@@ -16,14 +16,22 @@ jobs:
         uses: actions/setup-java@v1
         with:
           java-version: 1.8
+      - name: Cache Maven packages
+        uses: actions/cache@v2
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
       - name: Build with Maven
-        run: mvn -B package --file pom.xml
+        run: mvn -B package
         
       - id: parse-version
         uses: actions/github-script@v3
         with:
-          script: return context.ref.substring(1)
+          script: return context
           result-encoding: string
+      - name: Context result
+        run: echo "${{steps.parse-version.outputs.result}}"
 
       - uses: actions/github-script@v3
         id: set-result
@@ -33,6 +41,10 @@ jobs:
       - name: Get result
         run: echo "${{steps.set-result.outputs.result}}"
   
+      - name: Package Zip
+        run: |
+          zip --junk-paths reservable-resources-1.0.0 ./target/reservable-resources.hpi README.md LICENSE
+          
       - name: Upload Release Asset
         id: upload-release-asset 
         uses: actions/upload-release-asset@v1
@@ -40,6 +52,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: https://uploads.github.com/repos/msiemczyk/reservable-resources-plugin/releases/tag/v1.0.0/assets
-          asset_path: ./target/reservable-resources.hpi
-          asset_name: reservable-resources-1.0.0.hpi
-          asset_content_type: application/octet-stream
+          asset_path: ./reservable-resources-1.0.0.zip
+          asset_name: package
+          asset_content_type: application/zip
