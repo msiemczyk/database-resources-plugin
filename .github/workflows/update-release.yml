@@ -50,7 +50,7 @@ jobs:
         
       - name: Upload Release Asset
         id: upload-release-asset 
-        uses: msiemczyk/upload-release-asset@v1
+        uses: msiemczyk/upload-release-asset@main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
