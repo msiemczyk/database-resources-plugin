@@ -54,7 +54,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: https://uploads.github.com/repos/msiemczyk/reservable-resources-plugin/releases/tag/v1.0.0/assets
+          upload_url: https://uploads.github.com/repos/msiemczyk/reservable-resources-plugin/releases/tag/v1.0.0/assets{?name,label}
           asset_path: ./reservable-resources-1.0.0.zip
           asset_name: package
           asset_content_type: application/zip
