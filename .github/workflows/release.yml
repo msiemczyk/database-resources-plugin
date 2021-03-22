@@ -31,9 +31,12 @@ jobs:
         run: |
           VERSION=$( mvn help:evaluate -Dexpression=project.version -q -DforceStdout )
           echo "::set-output name=version::$VERSION"
-      - name: Package Zip
+          
+      - name: Package zip
         run: |
-          zip --junk-paths ./target/reservable-resources-${{ steps.get_version.outputs.version }}.zip ./target/reservable-resources.hpi README.md LICENSE
+          cd target
+          zip --junk-paths reservable-resources-plugin-${{ steps.get_version.outputs.version }}.zip reservable-resources.hpi ../README.md ../LICENSE
+          cd ..
       
       - name: Create changelog text
         id: changelog
@@ -59,7 +62,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: target/reservable-resources-plugin-${{ steps.get_version.outputs.version }}.zip
+          asset_path: ./target/reservable-resources-plugin-${{ steps.get_version.outputs.version }}.zip
           asset_name: reservable-resources-plugin-${{ steps.get_version.outputs.version }}.zip
           asset_content_type: application/zip
           
