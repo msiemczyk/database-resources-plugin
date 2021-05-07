@@ -5,7 +5,7 @@ other servers needed, etc.), which can be used by the build using manually defin
 resource available, the build will wait a configurable amount of time to acquire one, after which the build
 will be aborted.
 
-The plugin will expose the node name to the build via a environment variable called <PREFIX>_NODE_NAME, where <PREFIX>
+The plugin will expose the node name to the build via a environment variable called \<PREFIX\>_NODE_NAME, where \<PREFIX\>
 is the the prefix that user needs to define for each job. If you don't care about this you can just use the default prefix.
 The reservable resources can also define additional settings that will exposed to the build using same mechanism.
   
